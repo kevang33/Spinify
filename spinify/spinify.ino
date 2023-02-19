@@ -65,7 +65,6 @@ String time_left;
 String curr_track;
 float coms = -1;
 int play_type;
-int vol;
 
 uint8_t prevPrevBtnState = 1; // Inputs are pulled up
 uint8_t prevNextBtnState = 1;
@@ -77,7 +76,6 @@ void setup() {
   curr_track = "<SONG NAME>";
   time_left = 100;
   play_type = PAUSE;
-  vol = 50;
 
   // Set up the LCD's number of columns and rows:
   LCD.begin();
@@ -235,7 +233,7 @@ void loop() {
   const char delim[4] = ",";
 
 
-  String coms = String(play_type) + "," + String(vol) + "," + String(poweredOff); 
+  String coms = String(play_type) + "," + String(volume) + "," + String(poweredOff); 
 
   Serial.println(coms);
   
