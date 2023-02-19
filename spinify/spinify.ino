@@ -1,3 +1,8 @@
+#include <Wire.h> 
+#include <LiquidCrystal_I2C.h>
+
+
+
 // Uncomment for I2C LCD (Source: https://bitbucket.org/fmalpartida/new-liquidcrystal/downloads/):
 #include <LiquidCrystal_I2C.h>
 
@@ -50,6 +55,49 @@ String songTimeRemaining;
 bool poweredOff = false;
 bool isPaused = true;
 
+
+
+// Set the LCD address to 0x27 for a 16 chars and 2 line display
+LiquidCrystal_I2C lcd(0x27, 16, 2);
+
+String command;
+String on_off;
+String time_left;
+String curr_track;
+float coms = -1;
+int play_type;
+int vol;
+
+#define NEXT_TRACK 
+
+void setup() {
+  // put your setup code here, to run once:
+  lcd.begin();
+  Serial.begin(9600); // Baud rate
+
+  // initialize 
+  curr_track = "<SONG NAME>";
+  time_left = 100;
+  play_type = 1;
+  vol = 50;
+
+  // Set up the LCD's number of columns and rows:
+  LCD.begin();
+  LCD.createChar(PLAY_CHAR, playChar);
+  LCD.createChar(PAUSE_CHAR, pauseChar);
+  
+  LCD.clear();
+  LCD.setCursor(0, 0);
+  String songDetails = curr_track; // CURR
+  String nowPlaying = String("Now playing: ");
+  updateSongPlaying(curr_track, nowPlaying);
+
+  pinMode(MOTOR_PIN, OUTPUT);
+  pinMode(TILT_SWITCH_PIN, INPUT); //set pin2 as INPUT
+  digitalWrite(TILT_SWITCH_PIN, HIGH);//set pin2 as HIGH
+
+}
+
 void scrollMessage(int row, String message, int totalColumns) {
     unsigned long currentMillis = millis();
 
@@ -80,10 +128,10 @@ void printSecondLine(unsigned long remainingTime) {
   int newVolume = analogRead(A0);
   newVolume = map(newVolume, 0, 1015, 0, 100);
   Serial.print("Volume: ");
-  Serial.println(volume);
+  //Serial.println(volume);
 
   Serial.print("New Volume: ");
-  Serial.println(newVolume);
+  //Serial.println(newVolume);
   
   LCD.setCursor(0, 1);
   unsigned long currentMillis = millis();
@@ -144,8 +192,8 @@ void printSecondLine(unsigned long remainingTime) {
     for (int i = songTimeRemaining.length(); i < 16; i++) {
       songTimeRemaining += " ";  
     }
-    Serial.print("Time remaining: ");
-    Serial.println(songTimeRemaining);
+    //Serial.print("Time remaining: ");
+    //Serial.println(songTimeRemaining);
     if (isPaused) {
       LCD.write(PAUSE_CHAR);
     }
@@ -183,35 +231,59 @@ void powerOff() {
   turnOffMotor();
 }
 
-void setup() {
-  // Set up the LCD's number of columns and rows:
-  Serial.begin(115200);
-  LCD.begin();
-  LCD.createChar(PLAY_CHAR, playChar);
-  LCD.createChar(PAUSE_CHAR, pauseChar);
-  
-  LCD.clear();
-  LCD.setCursor(0, 0);
-  String songDetails = "Back In Black by ACDC";
-  String nowPlaying = String("Now playing: ");
-  updateSongPlaying(songDetails, nowPlaying);
 
-  pinMode(MOTOR_PIN, OUTPUT);
-  pinMode(TILT_SWITCH_PIN, INPUT); //set pin2 as INPUT
-  digitalWrite(TILT_SWITCH_PIN, HIGH);//set pin2 as HIGH
-  
-}
 
 void loop() {
+  delay(2000);
   // put your main code here, to run repeatedly:
-  
+  const char delim[4] = ",";
+
+
+  String coms = String(play_type) + "," + String(vol); 
+
+  Serial.println(coms);
+
   if (poweredOff == true) {
     powerOff();
   }
+
   else {
     isPaused = digitalRead(TILT_SWITCH_PIN);
     scrollMessage(0, songPlaying, 16);
-    printSecondLine(millis()); // TODO change to song remaining time
+    printSecondLine(time_left); // TODO change to song remaining time
   }
+
   delay(10);
+  if (Serial.available()) {
+    
+    command = Serial.readStringUntil(';');
+    command.trim(); // remove whitespace
+
+    // Split the input string by commas and convert each substring to an integer
+    int commaIndex1 = command.indexOf(',');
+    int commaIndex2 = command.indexOf(',', commaIndex1 + 1);
+    int endIndex = command.indexOf(':', commaIndex2 + 1);
+
+    if (commaIndex1 != -1 && commaIndex2 != -1) {
+      on_off = command.substring(0, commaIndex1);
+      time_left = command.substring(commaIndex1 + 1, commaIndex2);
+      curr_track = command.substring(commaIndex2 + 1, endIndex);
+    }
+    // const char* rasp_to_ard = command.c_str();
+    // ### DEBUG PRINTS TO LCD ### 
+    // lcd.clear();
+    // lcd.setCursor(0, 0);
+    // lcd.print(on_off);
+    // lcd.print(" ");
+    // lcd.print(time_left);
+    // lcd.print(" ");
+    // lcd.print(curr_track);
+    // lcd.setCursor(0, 1);
+    // lcd.print(commaIndex1);
+    // lcd.print(" ");
+    // lcd.print(commaIndex2);
+    // lcd.print(" ");
+
+  }
+  digitalWrite(LED_BUILTIN, 0);
 }
