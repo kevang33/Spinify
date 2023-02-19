@@ -1,15 +1,17 @@
-#include <Wire.h> 
-#include <LiquidCrystal_I2C.h>
-
-
-
-// Uncomment for I2C LCD (Source: https://bitbucket.org/fmalpartida/new-liquidcrystal/downloads/):
 #include <LiquidCrystal_I2C.h>
 
 #define PLAY_CHAR 0
 #define PAUSE_CHAR 1
 
 #define TILT_SWITCH_PIN 2
+#define MOTOR_PIN 3
+#define PREV_PIN 5
+#define NEXT_PIN 4
+
+#define PAUSE 0
+#define PLAY 1
+#define NEXT 2
+#define PREV 3
 
 // If using an I2C LCD, use I2C Scanner sketch to find address:
 //LiquidCrystal_I2C LCD(0x27, 2, 1, 0, 4, 5, 6, 7, 3, POSITIVE);
@@ -47,7 +49,6 @@ String songPlaying;
 unsigned long previousVolumeUpdate = 0;
 unsigned long volumePersistenceTime = 1000;
 
-const int MOTOR_PIN = 3;
 const uint8_t MOTOR_SPEED = 100;
 
 String songTimeRemaining;
@@ -55,10 +56,7 @@ String songTimeRemaining;
 bool poweredOff = false;
 bool isPaused = true;
 
-
-
-// Set the LCD address to 0x27 for a 16 chars and 2 line display
-LiquidCrystal_I2C lcd(0x27, 16, 2);
+const String nowPlaying = String("Now playing: ");
 
 String command;
 String on_off;
@@ -68,17 +66,13 @@ float coms = -1;
 int play_type;
 int vol;
 
-#define NEXT_TRACK 
-
 void setup() {
-  // put your setup code here, to run once:
-  lcd.begin();
   Serial.begin(9600); // Baud rate
 
   // initialize 
   curr_track = "<SONG NAME>";
   time_left = 100;
-  play_type = 1;
+  play_type = PAUSE;
   vol = 50;
 
   // Set up the LCD's number of columns and rows:
@@ -88,13 +82,15 @@ void setup() {
   
   LCD.clear();
   LCD.setCursor(0, 0);
+  LCD.print("Feeling groovy?");
   String songDetails = curr_track; // CURR
-  String nowPlaying = String("Now playing: ");
-  updateSongPlaying(curr_track, nowPlaying);
 
   pinMode(MOTOR_PIN, OUTPUT);
-  pinMode(TILT_SWITCH_PIN, INPUT); //set pin2 as INPUT
-  digitalWrite(TILT_SWITCH_PIN, HIGH);//set pin2 as HIGH
+  pinMode(TILT_SWITCH_PIN, INPUT_PULLUP);
+  pinMode(NEXT_PIN, INPUT_PULLUP);
+//  digitalWrite(NEXT_PIN, HIGH);
+  pinMode(PREV_PIN, INPUT_PULLUP);
+//  digitalWrite(PREV_PIN, HIGH);
 
 }
 
@@ -127,10 +123,10 @@ void updateSongPlaying(String songDetails, String nowPlaying) {
 void printSecondLine(unsigned long remainingTime) {
   int newVolume = analogRead(A0);
   newVolume = map(newVolume, 0, 1015, 0, 100);
-  Serial.print("Volume: ");
+  //Serial.print("Volume: ");
   //Serial.println(volume);
 
-  Serial.print("New Volume: ");
+  //Serial.print("New Volume: ");
   //Serial.println(newVolume);
   
   LCD.setCursor(0, 1);
@@ -234,7 +230,6 @@ void powerOff() {
 
 
 void loop() {
-  delay(2000);
   // put your main code here, to run repeatedly:
   const char delim[4] = ",";
 
@@ -248,9 +243,27 @@ void loop() {
   }
 
   else {
-    isPaused = digitalRead(TILT_SWITCH_PIN);
+    isPaused = !digitalRead(TILT_SWITCH_PIN);
+
+    if (isPaused) {
+      turnOffMotor();
+    }
+    else {
+      turnOnMotor();
+    }
+    uint8_t next = digitalRead(NEXT_PIN);
+    uint8_t prev = digitalRead(PREV_PIN);
+    if (!next) {
+      play_type = NEXT;
+    }
+    else if (!prev) {
+      play_type = PREV;
+    }
+    else {
+      play_type = (isPaused) ? PAUSE : PLAY;
+    }
     scrollMessage(0, songPlaying, 16);
-    printSecondLine(time_left); // TODO change to song remaining time
+    printSecondLine(time_left.toInt()); // TODO change to song remaining time
   }
 
   delay(10);
@@ -267,7 +280,11 @@ void loop() {
     if (commaIndex1 != -1 && commaIndex2 != -1) {
       on_off = command.substring(0, commaIndex1);
       time_left = command.substring(commaIndex1 + 1, commaIndex2);
-      curr_track = command.substring(commaIndex2 + 1, endIndex);
+      String new_track = command.substring(commaIndex2 + 1, endIndex);
+      if (new_track != curr_track) {
+        curr_track = new_track;
+        updateSongPlaying(curr_track, nowPlaying);
+      }
     }
     // const char* rasp_to_ard = command.c_str();
     // ### DEBUG PRINTS TO LCD ### 
@@ -285,5 +302,4 @@ void loop() {
     // lcd.print(" ");
 
   }
-  digitalWrite(LED_BUILTIN, 0);
 }
