@@ -5,8 +5,9 @@
 
 #define TILT_SWITCH_PIN 2
 #define MOTOR_PIN 3
-#define PREV_PIN 5
 #define NEXT_PIN 4
+#define PREV_PIN 5
+#define SW_PIN 6
 
 #define PAUSE 0
 #define PLAY 1
@@ -53,7 +54,7 @@ const uint8_t MOTOR_SPEED = 100;
 
 String songTimeRemaining;
 
-bool poweredOff = false;
+uint8_t poweredOff = 0;
 bool isPaused = true;
 
 const String nowPlaying = String("Now playing: ");
@@ -65,6 +66,9 @@ String curr_track;
 float coms = -1;
 int play_type;
 int vol;
+
+uint8_t prevPrevBtnState = 1; // Inputs are pulled up
+uint8_t prevNextBtnState = 1;
 
 void setup() {
   Serial.begin(9600); // Baud rate
@@ -88,10 +92,8 @@ void setup() {
   pinMode(MOTOR_PIN, OUTPUT);
   pinMode(TILT_SWITCH_PIN, INPUT_PULLUP);
   pinMode(NEXT_PIN, INPUT_PULLUP);
-//  digitalWrite(NEXT_PIN, HIGH);
   pinMode(PREV_PIN, INPUT_PULLUP);
-//  digitalWrite(PREV_PIN, HIGH);
-
+  pinMode(SW_PIN, INPUT_PULLUP);
 }
 
 void scrollMessage(int row, String message, int totalColumns) {
@@ -228,21 +230,23 @@ void powerOff() {
 }
 
 
-
 void loop() {
   // put your main code here, to run repeatedly:
   const char delim[4] = ",";
 
 
-  String coms = String(play_type) + "," + String(vol); 
+  String coms = String(play_type) + "," + String(vol) + "," + String(poweredOff); 
 
   Serial.println(coms);
+  
+  poweredOff = digitalRead(SW_PIN);
 
-  if (poweredOff == true) {
+  if (poweredOff) {
     powerOff();
   }
 
   else {
+    LCD.backlight();
     isPaused = !digitalRead(TILT_SWITCH_PIN);
 
     if (isPaused) {
@@ -253,17 +257,24 @@ void loop() {
     }
     uint8_t next = digitalRead(NEXT_PIN);
     uint8_t prev = digitalRead(PREV_PIN);
-    if (!next) {
+
+    if (next == 0&& prevNextBtnState == 1) {
       play_type = NEXT;
+      prevNextBtnState = next;
     }
-    else if (!prev) {
+    else if (prev == 0 && prevPrevBtnState == 1) {
       play_type = PREV;
+      prevPrevBtnState = prev;
     }
     else {
       play_type = (isPaused) ? PAUSE : PLAY;
     }
+    prevPrevBtnState = prev;
+    prevNextBtnState = next;
+
+    
     scrollMessage(0, songPlaying, 16);
-    printSecondLine(time_left.toInt()); // TODO change to song remaining time
+    printSecondLine(time_left.toInt());
   }
 
   delay(10);
